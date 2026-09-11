@@ -1,4 +1,4 @@
-ركب كامل import os
+import os
 import random
 from flask import Flask, jsonify, request
 from pytrends.request import TrendReq
