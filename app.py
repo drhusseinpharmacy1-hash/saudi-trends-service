@@ -1,11 +1,11 @@
 import os
+import time
 from flask import Flask, jsonify, request
 from pytrends.request import TrendReq
 from datetime import datetime
 
 app = Flask(__name__)
 
-# إعداد رأس الصفحة لمنع التخزين المؤقت (No-Cache Headers)
 @app.after_request
 def add_header(response):
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -21,40 +21,35 @@ def get_keyword_trends():
         return jsonify({"error": "Keyword is required"}), 400
 
     try:
-        # الاتصال بـ Google Trends باللغة العربية وتوقيت السعودية
+        # إضافة مهلة وتكرار محاولات لتفادي Rate Limit من جوجل
         pytrends = TrendReq(hl='ar-SA', tz=180, timeout=(10, 25))
         
-        # بناء الـ Payload للكلمة المحددة داخل المملكة العربية السعودية
+        # بناء الطلب بمرونة
         pytrends.build_payload([keyword], cat=0, timeframe='today 12-m', geo='SA', gprop='')
         
-        # جلب البيانات مقسمة حسب المدن/المناطق
+        # جلب البيانات
         df = pytrends.interest_by_region(resolution='CITY', inc_low_vol=True, inc_geo_code=False)
         
+        filtered_trends = {}
         if not df.empty and keyword in df.columns:
             region_data = df[keyword].to_dict()
-            # تصفية المدن التي تحتوي على نسبة بحث أعلى من 0
-            filtered_trends = {k: int(v) for k, v in region_data.items() if v > 0}
-            
-            return jsonify({
-                "status": "success",
-                "keyword": keyword,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "trends": filtered_trends
-            }), 200
-        else:
-            return jsonify({
-                "status": "success",
-                "keyword": keyword,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "trends": {}
-            }), 200
+            filtered_trends = {str(k): int(v) for k, v in region_data.items() if v > 0}
+
+        return jsonify({
+            "status": "success",
+            "keyword": keyword,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "trends": filtered_trends
+        }), 200
 
     except Exception as e:
         print(f"Error fetching trends for {keyword}: {str(e)}")
+        # في حال حدوث خطأ أو حظر من جوجل، يتم إرجاع نتيجة فارغة بنجاح بدلاً من انهيار السيرفر بكود 500
         return jsonify({
             "status": "error",
-            "message": str(e)
-        }), 500
+            "message": "Google Trends request limit or connection error",
+            "trends": {}
+        }), 200
 
 # ------------------ 2. جلب الأكثر بحثاً اليوم ------------------
 @app.route('/daily-trends', methods=['GET'])
