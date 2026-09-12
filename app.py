@@ -16,7 +16,7 @@ USER_AGENTS = [
 def get_keyword_trends():
     keyword = request.args.get('keyword', '').strip()
     if not keyword:
-        return jsonify({"error": "Keyword is required"}), 400
+        return jsonify({"status": "error", "message": "Keyword is required", "trends": {}}), 200
 
     try:
         headers = {'User-Agent': random.choice(USER_AGENTS)}
@@ -52,13 +52,13 @@ def get_keyword_trends():
 
     except Exception as e:
         print(f"Error fetching trends for {keyword}: {str(e)}")
-        # إرجاع استجابة واضحة في حال الحظر المباشر من Google
+        # نرجع HTTP 200 دائماً لتجنب خطأ 500 في الأندرويد، ونوضح الخطأ في الـ JSON
         return jsonify({
             "status": "error",
-            "message": "Google rate limit hit or timeout occurred",
+            "message": "Google Trends rate limit or connection issue",
             "details": str(e),
             "trends": {}
-        }), 429 if "429" in str(e) else 500
+        }), 200
 
 # ------------------ 2. جلب الأكثر بحثاً اليوم ------------------
 @app.route('/daily-trends', methods=['GET'])
