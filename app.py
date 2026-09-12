@@ -21,7 +21,6 @@ def get_keyword_trends():
     try:
         headers = {'User-Agent': random.choice(USER_AGENTS)}
         
-        # تهيئة pytrends لتفادي مشاكل الحظر على Render
         pytrends = TrendReq(
             hl='ar-SA', 
             tz=180, 
@@ -31,16 +30,12 @@ def get_keyword_trends():
             requests_args={'headers': headers}
         )
         
-        # بناء طلب البيانات على مستوى السعودية (geo='SA')
         pytrends.build_payload([keyword], cat=0, timeframe='today 12-m', geo='SA', gprop='')
-        
-        # جلب البيانات على مستوى المناطق الإدارية (COUNTRY)
         df = pytrends.interest_by_region(resolution='COUNTRY', inc_low_vol=True, inc_geo_code=False)
         
         filtered_trends = {}
         if not df.empty and keyword in df.columns:
             region_data = df[keyword].to_dict()
-            # تصفية المناطق ونقل القيم الأكبر من 0 مع ترتيبها تنازلياً حسب النسبة
             sorted_regions = sorted(
                 [(str(k), int(v)) for k, v in region_data.items() if v > 0], 
                 key=lambda x: x[1], 
@@ -57,11 +52,13 @@ def get_keyword_trends():
 
     except Exception as e:
         print(f"Error fetching trends for {keyword}: {str(e)}")
+        # إرجاع استجابة واضحة في حال الحظر المباشر من Google
         return jsonify({
             "status": "error",
-            "message": str(e),
+            "message": "Google rate limit hit or timeout occurred",
+            "details": str(e),
             "trends": {}
-        }), 200
+        }), 429 if "429" in str(e) else 500
 
 # ------------------ 2. جلب الأكثر بحثاً اليوم ------------------
 @app.route('/daily-trends', methods=['GET'])
